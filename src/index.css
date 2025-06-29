@@ -1,0 +1,174 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom scrollbar styles */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #2a2a2a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #555;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #777;
+}
+
+/* Monaco Editor Theme Overrides */
+.monaco-editor {
+  background-color: #1a1a1a !important;
+}
+
+.monaco-editor .margin {
+  background-color: #1a1a1a !important;
+}
+
+/* WebStudio selection styles for iframe content */
+.webstudio-preview-frame [data-webstudio-selected] {
+  outline: 2px solid #6366f1 !important;
+  outline-offset: 2px !important;
+}
+
+.webstudio-preview-frame [data-webstudio-element]:hover {
+  outline: 1px solid #6366f1 !important;
+  outline-offset: 1px !important;
+  cursor: pointer !important;
+}
+
+.webstudio-preview-frame [data-webstudio-element] {
+  position: relative;
+}
+
+/* Loading animation */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Resizable panels */
+.resize-handle {
+  background-color: #404040;
+  cursor: col-resize;
+  width: 4px;
+  transition: background-color 0.2s;
+}
+
+.resize-handle:hover {
+  background-color: #6366f1;
+}
+
+/* Custom button styles */
+.btn {
+  @apply px-3 py-2 rounded-lg font-medium transition-all duration-200 flex items-center gap-2 text-sm;
+}
+
+.btn-primary {
+  @apply bg-primary-600 text-white hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-gray-900;
+}
+
+.btn-secondary {
+  @apply bg-gray-700 text-gray-200 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-gray-900;
+}
+
+.btn-ghost {
+  @apply text-gray-400 hover:text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-gray-900;
+}
+
+/* Tool button styles */
+.tool-btn {
+  @apply w-9 h-9 flex items-center justify-center rounded-lg bg-transparent text-gray-400 hover:text-white hover:bg-gray-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-gray-900;
+}
+
+.tool-btn.active {
+  @apply bg-primary-600 text-white;
+}
+
+/* Form input styles */
+.form-input {
+  @apply w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent;
+}
+
+.form-input-sm {
+  @apply bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-transparent;
+}
+
+/* Panel styles */
+.panel {
+  @apply bg-gray-800 border-r border-gray-700;
+}
+
+.panel-header {
+  @apply px-4 py-3 border-b border-gray-700 font-semibold text-white;
+}
+
+.panel-section {
+  @apply p-4 border-b border-gray-700;
+}
+
+.section-title {
+  @apply text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3;
+}
+
+/* File explorer styles */
+.file-item {
+  @apply flex items-center gap-2 px-2 py-1 rounded text-sm text-gray-300 hover:bg-gray-700 cursor-pointer transition-colors;
+}
+
+.file-item.active {
+  @apply bg-primary-600 text-white;
+}
+
+/* Property editor styles */
+.property-row {
+  @apply flex items-center justify-between mb-2;
+}
+
+.property-label {
+  @apply text-xs text-gray-400 min-w-16;
+}
+
+/* Status bar */
+.status-bar {
+  @apply h-6 bg-gray-950 border-t border-gray-700 flex items-center px-4 text-xs text-gray-400;
+}
+
+/* Modal styles */
+.modal-overlay {
+  @apply fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50;
+}
+
+.modal-content {
+  @apply bg-gray-800 rounded-xl p-6 max-w-md w-full mx-4 max-h-[80vh] overflow-y-auto;
+}
+
+.modal-header {
+  @apply flex justify-between items-center mb-4;
+}
+
+.modal-title {
+  @apply text-lg font-semibold text-white;
+}
+
+/* Zoom controls */
+.zoom-control {
+  @apply flex items-center bg-gray-700 rounded-lg p-1;
+}
+
+.zoom-btn {
+  @apply w-6 h-6 flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-600 rounded text-sm font-mono;
+}
+
+.zoom-value {
+  @apply px-2 text-xs text-gray-300 min-w-12 text-center;
+}
