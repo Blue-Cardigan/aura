@@ -31,7 +31,7 @@ const WebStudio: React.FC = () => {
         console.log('WebContainer initialized successfully')
       } catch (error) {
         console.error('Failed to initialize WebContainer:', error)
-        setStatusMessage('WebContainer not ready yet')
+        setStatusMessage('Failed to initialize WebContainer - some features may not work')
       }
     }
 
@@ -130,23 +130,96 @@ const WebStudio: React.FC = () => {
     setStatusMessage(`Selected: ${element.tagName.toLowerCase()} - ${element.id || element.className || 'element'}`)
   }, [])
 
+  const handleProjectUpdate = useCallback((updatedProject: Project) => {
+    console.log('WebStudio: Project update requested:', updatedProject)
+    setCurrentProject(updatedProject)
+    
+    // Save the updated project
+    try {
+      projectService.saveProject(updatedProject)
+      setStatusMessage(`Project "${updatedProject.name}" updated successfully`)
+    } catch (error) {
+      console.error('WebStudio: Failed to save updated project:', error)
+      setStatusMessage('Failed to save project updates')
+    }
+  }, [projectService])
+
   const handleElementUpdate = useCallback(async (property: string, value: string) => {
-    if (!selectedElement || !currentProject) return
+    console.log('WebStudio: Element update requested:', { property, value, selectedElement })
+    
+    if (!selectedElement) {
+      console.warn('WebStudio: No element selected for update')
+      setStatusMessage('No element selected')
+      return
+    }
+    
+    if (!currentProject) {
+      console.warn('WebStudio: No project loaded for update')
+      setStatusMessage('No project loaded')
+      return
+    }
 
     try {
-      // Update the element in the project
+      // First, update the element visually in the iframe
+      if (selectedElement.element && property.startsWith('style.')) {
+        const styleProperty = property.replace('style.', '')
+        const iframeElement = selectedElement.element
+        
+        // Convert camelCase to kebab-case for CSS properties
+        const cssProperty = styleProperty.replace(/([A-Z])/g, '-$1').toLowerCase()
+        
+        console.log(`WebStudio: Applying visual update: ${cssProperty} = ${value}`)
+        iframeElement.style.setProperty(cssProperty, value)
+        
+        // Update the selectedElement object to reflect the change
+        const updatedElement = {
+          ...selectedElement,
+          styles: {
+            ...selectedElement.styles,
+            [styleProperty]: value
+          }
+        }
+        setSelectedElement(updatedElement)
+      } else if (property === 'textContent') {
+        console.log(`WebStudio: Updating text content: ${value}`)
+        if (selectedElement.element) {
+          selectedElement.element.textContent = value
+        }
+        
+        const updatedElement = {
+          ...selectedElement,
+          textContent: value
+        }
+        setSelectedElement(updatedElement)
+      } else if (property === 'id' || property === 'className') {
+        console.log(`WebStudio: Updating attribute ${property}: ${value}`)
+        if (selectedElement.element) {
+          selectedElement.element.setAttribute(property === 'className' ? 'class' : property, value)
+        }
+        
+        const updatedElement = {
+          ...selectedElement,
+          [property]: value
+        }
+        setSelectedElement(updatedElement)
+      }
+      
+      // Then update the project structure (this will eventually save to files)
       const updatedProject = await projectService.updateElement(currentProject, selectedElement, property, value)
       setCurrentProject(updatedProject)
       
-      // Update the WebContainer with the new code
-      await webContainerService.updateProject(updatedProject)
+      // Update the WebContainer with the new code (for file-based persistence)
+      if (webContainerService.getServerUrl()) {
+        await webContainerService.updateProject(updatedProject)
+      }
       
       setStatusMessage(`Updated ${property}: ${value}`)
+      console.log('WebStudio: Element update completed successfully')
     } catch (error) {
-      console.error('Failed to update element:', error)
+      console.error('WebStudio: Failed to update element:', error)
       setStatusMessage('Failed to update element')
     }
-  }, [selectedElement, currentProject])
+  }, [selectedElement, currentProject, webContainerService, projectService])
 
   const handleZoomChange = useCallback((newZoom: number) => {
     setZoomLevel(Math.max(10, Math.min(500, newZoom)))
@@ -205,7 +278,7 @@ const WebStudio: React.FC = () => {
 
   return (
     <div className="flex h-screen bg-gray-900 text-white">
-      {/* Sidebar */}
+      {/* Sidebar with Full Figma Features */}
       <Sidebar
         currentProject={currentProject}
         onCreateProject={handleCreateProject}
@@ -214,6 +287,8 @@ const WebStudio: React.FC = () => {
         onSaveProject={handleSaveProject}
         onElementSelect={handleElementSelect}
         selectedElement={selectedElement}
+        onCodeChange={handleCodeChange}
+        onProjectUpdate={handleProjectUpdate}
       />
 
       {/* Main Content */}

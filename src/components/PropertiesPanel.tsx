@@ -25,14 +25,17 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   }
 
   const handleStyleChange = (property: string, value: string) => {
+    console.log('PropertiesPanel: Style change:', property, value)
     onElementUpdate(`style.${property}`, value)
   }
 
   const handleAttributeChange = (attribute: string, value: string) => {
+    console.log('PropertiesPanel: Attribute change:', attribute, value)
     onElementUpdate(attribute, value)
   }
 
   const handleContentChange = (value: string) => {
+    console.log('PropertiesPanel: Content change:', value)
     onElementUpdate('textContent', value)
   }
 
@@ -55,6 +58,17 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
       </div>
       
       <div className="flex-1 overflow-y-auto">
+        {/* Debug Info */}
+        <div className="panel-section border-b border-yellow-600 bg-yellow-900/20">
+          <h3 className="section-title text-yellow-400">Debug Info</h3>
+          <div className="text-xs text-yellow-300 space-y-1">
+            <div>Element: {selectedElement.tagName.toLowerCase()}</div>
+            <div>Data Attr: {selectedElement.dataAttribute}</div>
+            <div>ID: {selectedElement.id || 'none'}</div>
+            <div>Classes: {selectedElement.className || 'none'}</div>
+          </div>
+        </div>
+        
         {/* Element Info */}
         <div className="panel-section">
           <h3 className="section-title flex items-center gap-2">

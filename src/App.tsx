@@ -1,4 +1,3 @@
-import React from 'react'
 import WebStudio from './components/WebStudio'
 
 function App() {

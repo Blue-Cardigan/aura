@@ -10,6 +10,10 @@ export interface Project {
   savedAt?: string
   githubUrl?: string
   githubBranch?: string
+  components?: SavedComponent[]  // User-saved components
+  designSystem?: DesignSystem   // Project's design system
+  layers?: LayerNode[]          // Project layer structure
+  history?: ProjectHistoryEntry[] // Project edit history
 }
 
 // WebContainer file system types
@@ -405,3 +409,92 @@ export interface ExtendedProject extends Project {
 
 // Export everything for easy imports
 export * from './index'
+
+// Enhanced Project Features
+export interface SavedComponent {
+  id: string
+  name: string
+  category: string
+  description: string
+  code: string
+  preview: string
+  tags: string[]
+  favorite: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface DesignSystem {
+  colors: ColorToken[]
+  typography: TypographyToken[]
+  spacing: SpacingToken[]
+  borderRadius: { name: string; value: string }[]
+  shadows: { name: string; value: string }[]
+  version: string
+  updatedAt: string
+}
+
+export interface ColorToken {
+  name: string
+  value: string
+  description?: string
+}
+
+export interface TypographyToken {
+  name: string
+  fontSize: string
+  fontWeight: string
+  lineHeight: string
+  description?: string
+}
+
+export interface SpacingToken {
+  name: string
+  value: string
+  description?: string
+}
+
+export interface LayerNode {
+  id: string
+  name: string
+  type: string
+  element?: HTMLElement
+  children: LayerNode[]
+  visible: boolean
+  locked: boolean
+  dataAttribute: string
+  depth: number
+  parentId?: string
+  order: number
+}
+
+export interface ProjectHistoryEntry {
+  id: string
+  timestamp: string
+  action: string
+  description: string
+  data: any
+  canRevert: boolean
+}
+
+// Enhanced component props
+export interface LayersPanelProps {
+  selectedElement: SelectedElement | null
+  onElementSelect: (element: SelectedElement) => void
+  currentProject: Project | null
+  onCodeChange: (filePath: string, content: string) => void
+  onProjectUpdate: (project: Project) => void
+}
+
+export interface ComponentsPanelProps {
+  currentProject: Project | null
+  onAddComponent: (filePath: string, content: string) => void
+  selectedElement: SelectedElement | null
+  onProjectUpdate: (project: Project) => void
+}
+
+export interface DesignSystemPanelProps {
+  currentProject: Project | null
+  onUpdateDesignSystem: (filePath: string, content: string) => void
+  onProjectUpdate: (project: Project) => void
+}

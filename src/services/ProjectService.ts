@@ -335,7 +335,7 @@ export class ProjectService {
       'package.json': {
         file: {
           contents: JSON.stringify({
-            name: 'webstudio-project',
+            name: 'aura-project',
             private: true,
             version: '0.0.0',
             type: 'module',
@@ -369,7 +369,7 @@ export class ProjectService {
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>WebStudio Project</title>
+    <title>Aura Project</title>
   </head>
   <body>
     <div id="root"></div>
@@ -477,7 +477,7 @@ function App() {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center" data-webstudio-element="root">
       <div className="max-w-md mx-auto text-center" data-webstudio-element="container">
         <h1 className="text-4xl font-bold text-gray-900 mb-4" data-webstudio-element="title">
-          Welcome to WebStudio
+          Welcome to Aura
         </h1>
         <p className="text-lg text-gray-600 mb-8" data-webstudio-element="description">
           Visual design meets code. Click on any element to start editing.
@@ -535,7 +535,7 @@ export default App`
       'package.json': {
         file: {
           contents: JSON.stringify({
-            name: 'webstudio-vanilla-project',
+            name: 'aura-vanilla-project',
             private: true,
             version: '0.0.0',
             type: 'module',
@@ -557,7 +557,7 @@ export default App`
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>WebStudio Vanilla Project</title>
+    <title>Aura Vanilla Project</title>
     <link rel="stylesheet" href="/style.css">
   </head>
   <body>
@@ -625,7 +625,7 @@ export default App`
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>WebStudio Blank Project</title>
+    <title>Aura Blank Project</title>
     <style>
       [data-webstudio-selected] {
         outline: 2px solid #6366f1 !important;
