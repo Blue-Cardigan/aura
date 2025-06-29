@@ -5,6 +5,7 @@ import Canvas from './Canvas'
 import PropertiesPanel from './PropertiesPanel'
 import StatusBar from './StatusBar'
 import CodeEditor from './CodeEditor'
+import ChatBot from './ChatBot'
 import { WebContainerService } from '../services/WebContainerService'
 import { ProjectService } from '../services/ProjectService'
 import type { Project, SelectedElement, Tool } from '../types'
@@ -28,15 +29,31 @@ const WebStudio: React.FC = () => {
     const initializeWebContainer = async () => {
       try {
         await webContainerService.initialize()
+        // Make webContainerService globally accessible
+        ;(window as any).webContainerService = webContainerService
         console.log('WebContainer initialized successfully')
       } catch (error) {
         console.error('Failed to initialize WebContainer:', error)
-        setStatusMessage('Failed to initialize WebContainer - some features may not work')
+        setStatusMessage('Initialising WebContainer...')
       }
     }
 
     initializeWebContainer()
   }, [])
+
+  // Set up global interfaces for ChatBot integration
+  useEffect(() => {
+    // Global interface for element updates
+    ;(window as any).webStudioInterface = {
+      updateElement: handleElementUpdate,
+      selectElement: handleElementSelect,
+      createProject: handleCreateProject,
+      loadProject: handleLoadProject,
+      saveProject: handleSaveProject
+    }
+
+    console.log('WebStudio: Global interfaces initialized for ChatBot')
+  })
 
   const handleCreateProject = useCallback(async (name: string, template: string) => {
     setIsLoading(true)
@@ -347,9 +364,18 @@ const WebStudio: React.FC = () => {
       </div>
 
       {/* Properties Panel */}
-      <PropertiesPanel
+      {/* <PropertiesPanel
         selectedElement={selectedElement}
         onElementUpdate={handleElementUpdate}
+      /> */}
+
+      {/* AI ChatBot */}
+      <ChatBot
+        currentProject={currentProject}
+        onCodeChange={handleCodeChange}
+        onProjectUpdate={handleProjectUpdate}
+        onElementSelect={handleElementSelect}
+        selectedElement={selectedElement}
       />
     </div>
   )

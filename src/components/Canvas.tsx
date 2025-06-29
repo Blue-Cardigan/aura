@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react'
-import { Loader2 } from 'lucide-react'
+import { Loader2, RefreshCw } from 'lucide-react'
 import type { SelectedElement, Tool } from '../types'
 
 interface CanvasProps {
@@ -35,6 +35,14 @@ const Canvas: React.FC<CanvasProps> = ({
     const iframeWindow = iframe.contentWindow
     
     console.log('Canvas: Setting up visual editing...')
+    
+    // Make setupVisualEditing globally accessible for re-triggering
+    ;(window as any).webStudioCanvas = {
+      setupVisualEditing: () => {
+        console.log('Canvas: Re-scanning elements after component addition')
+        setTimeout(() => setupVisualEditing(), 100)
+      }
+    }
     
     // Add WebStudio styles to iframe
     let existingStyle = iframeDoc.getElementById('webstudio-styles')
@@ -271,16 +279,25 @@ const Canvas: React.FC<CanvasProps> = ({
       {/* Visual Editing Status */}
       {previewUrl && (
         <div className="absolute top-4 right-4 z-10 bg-gray-800 rounded-lg px-3 py-2 text-sm">
-          <div className="flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${
-              visualEditingReady ? 'bg-green-500' : 'bg-yellow-500'
-            }`}></div>
-            <span className="text-gray-300">
-              {visualEditingReady 
-                ? `Ready (${editableElementsCount} elements)` 
-                : 'Setting up...'
-              }
-            </span>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${
+                visualEditingReady ? 'bg-green-500' : 'bg-yellow-500'
+              }`}></div>
+              <span className="text-gray-300">
+                {visualEditingReady 
+                  ? `Ready (${editableElementsCount} elements)` 
+                  : `Setting up...`
+                }
+              </span>
+            </div>
+            <button
+              onClick={setupVisualEditing}
+              className="p-1 bg-blue-600 hover:bg-blue-700 text-white rounded"
+              title="Refresh element detection"
+            >
+              <RefreshCw size={12} />
+            </button>
           </div>
           {visualEditingReady && currentTool === 'select' && (
             <div className="text-xs text-gray-400 mt-1">

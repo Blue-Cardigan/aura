@@ -13,12 +13,7 @@ import {
   Copy,
   ExternalLink
 } from 'lucide-react'
-import type { Project } from '../types'
-
-interface AssetsPanelProps {
-  currentProject: Project | null
-  onAddAsset: (filePath: string, content: string) => void
-}
+import type { AssetsPanelProps } from '../types'
 
 interface Asset {
   id: string
@@ -34,8 +29,11 @@ interface Asset {
 }
 
 const AssetsPanel: React.FC<AssetsPanelProps> = ({
+  selectedElement,
+  onElementSelect,
   currentProject,
-  onAddAsset
+  onCodeChange,
+  onProjectUpdate
 }) => {
   const [assets, setAssets] = useState<Asset[]>([])
   const [searchTerm, setSearchTerm] = useState('')
@@ -215,12 +213,12 @@ const AssetsPanel: React.FC<AssetsPanelProps> = ({
       const currentContent = await getCurrentAppContent()
       const updatedContent = insertAssetIntoComponent(currentContent, assetCode)
       
-      await onAddAsset('/src/App.tsx', updatedContent)
+      await onCodeChange('/src/App.tsx', updatedContent)
       console.log(`Inserted asset: ${asset.name}`)
     } catch (error) {
       console.error('Failed to insert asset:', error)
     }
-  }, [currentProject, onAddAsset])
+  }, [currentProject, onCodeChange])
 
   const getCurrentAppContent = async (): Promise<string> => {
     // In a real implementation, this would read from WebContainer

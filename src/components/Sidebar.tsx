@@ -98,32 +98,41 @@ const Sidebar: React.FC<SidebarProps> = ({
       case 'components':
         return (
           <ComponentsPanel
-            currentProject={currentProject}
-            onAddComponent={onCodeChange}
             selectedElement={selectedElement}
+            onElementSelect={onElementSelect}
+            currentProject={currentProject}
+            onCodeChange={onCodeChange}
             onProjectUpdate={onProjectUpdate}
           />
         )
       case 'assets':
         return (
           <AssetsPanel
+            selectedElement={selectedElement}
+            onElementSelect={onElementSelect}
             currentProject={currentProject}
-            onAddAsset={onCodeChange}
+            onCodeChange={onCodeChange}
+            onProjectUpdate={onProjectUpdate}
           />
         )
       case 'design-system':
         return (
           <DesignSystemPanel
+            selectedElement={selectedElement}
+            onElementSelect={onElementSelect}
             currentProject={currentProject}
-            onUpdateDesignSystem={onCodeChange}
+            onCodeChange={onCodeChange}
             onProjectUpdate={onProjectUpdate}
           />
         )
       case 'history':
         return (
           <HistoryPanel
+            selectedElement={selectedElement}
+            onElementSelect={onElementSelect}
             currentProject={currentProject}
-            onRestoreVersion={onCodeChange}
+            onCodeChange={onCodeChange}
+            onProjectUpdate={onProjectUpdate}
           />
         )
       case 'files':

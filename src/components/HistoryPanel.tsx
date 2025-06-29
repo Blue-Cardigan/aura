@@ -10,12 +10,7 @@ import {
   Bookmark,
   Plus
 } from 'lucide-react'
-import type { Project } from '../types'
-
-interface HistoryPanelProps {
-  currentProject: Project | null
-  onRestoreVersion: (filePath: string, content: string) => void
-}
+import type { HistoryPanelProps } from '../types'
 
 interface HistoryEntry {
   id: string
@@ -28,8 +23,11 @@ interface HistoryEntry {
 }
 
 const HistoryPanel: React.FC<HistoryPanelProps> = ({
+  selectedElement,
+  onElementSelect,
   currentProject,
-  onRestoreVersion
+  onCodeChange,
+  onProjectUpdate
 }) => {
   // Mock history data - in a real implementation, this would come from version control
   const [history, setHistory] = useState<HistoryEntry[]>([

@@ -11,6 +11,7 @@ export interface Project {
   githubUrl?: string
   githubBranch?: string
   components?: SavedComponent[]  // User-saved components
+  customComponents?: ComponentDefinition[]  // Custom components
   designSystem?: DesignSystem   // Project's design system
   layers?: LayerNode[]          // Project layer structure
   history?: ProjectHistoryEntry[] // Project edit history
@@ -487,14 +488,43 @@ export interface LayersPanelProps {
 }
 
 export interface ComponentsPanelProps {
-  currentProject: Project | null
-  onAddComponent: (filePath: string, content: string) => void
   selectedElement: SelectedElement | null
+  onElementSelect: (element: SelectedElement) => void
+  currentProject: Project | null
+  onCodeChange: (filePath: string, content: string) => void
   onProjectUpdate: (project: Project) => void
 }
 
+export interface ComponentDefinition {
+  id: string
+  name: string
+  category: string
+  icon: string
+  description: string
+  template: string
+  props: Record<string, any>
+}
+
 export interface DesignSystemPanelProps {
+  selectedElement: SelectedElement | null
+  onElementSelect: (element: SelectedElement) => void
   currentProject: Project | null
-  onUpdateDesignSystem: (filePath: string, content: string) => void
+  onCodeChange: (filePath: string, content: string) => void
+  onProjectUpdate: (project: Project) => void
+}
+
+export interface HistoryPanelProps {
+  selectedElement: SelectedElement | null
+  onElementSelect: (element: SelectedElement) => void
+  currentProject: Project | null
+  onCodeChange: (filePath: string, content: string) => void
+  onProjectUpdate: (project: Project) => void
+}
+
+export interface AssetsPanelProps {
+  selectedElement: SelectedElement | null
+  onElementSelect: (element: SelectedElement) => void
+  currentProject: Project | null
+  onCodeChange: (filePath: string, content: string) => void
   onProjectUpdate: (project: Project) => void
 }

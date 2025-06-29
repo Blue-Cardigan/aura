@@ -1,535 +1,797 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import { 
   Plus, 
   Search, 
-  Copy, 
-  Edit3,
-  Star,
-  Smartphone,
-  Monitor,
-  Tablet
+  Package, 
+  Grid, 
+  Type, 
+  Image, 
+  Square, 
+  Circle, 
+  MousePointer, 
+  Layout,
+  Menu,
+  Check,
+  X,
+  MoreHorizontal,
+  Copy,
+  Trash2,
+  Edit3
 } from 'lucide-react'
-import type { Project, SelectedElement } from '../types'
-
-interface ComponentsPanelProps {
-  currentProject: Project | null
-  onAddComponent: (filePath: string, content: string) => void
-  selectedElement: SelectedElement | null
-}
-
-interface Component {
-  id: string
-  name: string
-  category: string
-  description: string
-  code: string
-  preview: string
-  tags: string[]
-  favorite: boolean
-}
+import type { ComponentsPanelProps, ComponentDefinition, Project, SelectedElement } from '../types'
 
 const ComponentsPanel: React.FC<ComponentsPanelProps> = ({
+  selectedElement,
+  onElementSelect,
   currentProject,
-  onAddComponent,
-  selectedElement
+  onCodeChange,
+  onProjectUpdate
 }) => {
   const [searchTerm, setSearchTerm] = useState('')
-  const [selectedCategory, setSelectedCategory] = useState('all')
-  const [customComponents, setCustomComponents] = useState<Component[]>([])
-  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false)
+  const [selectedCategory, setSelectedCategory] = useState<string>('all')
+  const [isAddingComponent, setIsAddingComponent] = useState(false)
+  const [newComponentName, setNewComponentName] = useState('')
+  const [customComponents, setCustomComponents] = useState<ComponentDefinition[]>([])
+  const [draggedComponent, setDraggedComponent] = useState<ComponentDefinition | null>(null)
+  const [existingComponents, setExistingComponents] = useState<{id: string, name: string, type: string}[]>([])
+  const [showExistingComponents, setShowExistingComponents] = useState(false)
 
-  // Built-in component library
-  const builtInComponents: Component[] = [
+  // Initialize custom components from project
+  useEffect(() => {
+    if (currentProject?.customComponents) {
+      setCustomComponents(currentProject.customComponents)
+      console.log('ComponentsPanel: Loaded custom components from project')
+    }
+  }, [currentProject?.id])
+
+  // Default component definitions
+  const defaultComponents: ComponentDefinition[] = [
+    {
+      id: 'div-container',
+      name: 'Container',
+      category: 'layout',
+      icon: 'Square',
+      description: 'Basic container div',
+      template: '<div data-webstudio-element="container" className="p-4 border border-gray-300 rounded-lg bg-white">Container Content</div>',
+      props: {
+        className: 'p-4 border border-gray-300 rounded-lg bg-white'
+      }
+    },
+    {
+      id: 'flex-container',
+      name: 'Flex Container',
+      category: 'layout',
+      icon: 'Layout',
+      description: 'Flexbox container',
+      template: '<div data-webstudio-element="flex-container" className="flex gap-4 p-4">Flex Content</div>',
+      props: {
+        className: 'flex gap-4 p-4'
+      }
+    },
+    {
+      id: 'grid-container',
+      name: 'Grid Container',
+      category: 'layout', 
+      icon: 'Grid',
+      description: 'CSS Grid container',
+      template: '<div data-webstudio-element="grid-container" className="grid grid-cols-2 gap-4 p-4">Grid Content</div>',
+      props: {
+        className: 'grid grid-cols-2 gap-4 p-4'
+      }
+    },
+    {
+      id: 'heading-h1',
+      name: 'Heading 1',
+      category: 'text',
+      icon: 'Type',
+      description: 'Main heading',
+      template: '<h1 data-webstudio-element="heading-h1" className="text-3xl font-bold text-gray-900 mb-4">Your Heading</h1>',
+      props: {
+        className: 'text-3xl font-bold text-gray-900 mb-4'
+      }
+    },
+    {
+      id: 'heading-h2',
+      name: 'Heading 2',
+      category: 'text',
+      icon: 'Type',
+      description: 'Secondary heading',
+      template: '<h2 data-webstudio-element="heading-h2" className="text-2xl font-semibold text-gray-900 mb-3">Your Heading</h2>',
+      props: {
+        className: 'text-2xl font-semibold text-gray-900 mb-3'
+      }
+    },
+    {
+      id: 'paragraph',
+      name: 'Paragraph',
+      category: 'text',
+      icon: 'Type',
+      description: 'Text paragraph',
+      template: '<p data-webstudio-element="paragraph" className="text-gray-700 mb-4">Your paragraph text goes here. Click to edit this content.</p>',
+      props: {
+        className: 'text-gray-700 mb-4'
+      }
+    },
     {
       id: 'button-primary',
       name: 'Primary Button',
-      category: 'buttons',
-      description: 'A primary action button with hover effects',
-      code: `<button className="px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors" data-webstudio-element="primary-button">
-  Click me
-</button>`,
-      preview: '🔵 Primary Button',
-      tags: ['button', 'primary', 'cta'],
-      favorite: false
+      category: 'interactive',
+      icon: 'MousePointer',
+      description: 'Primary action button',
+      template: '<button data-webstudio-element="button-primary" className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">Click me</button>',
+      props: {
+        className: 'px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors'
+      }
     },
     {
       id: 'button-secondary',
       name: 'Secondary Button',
-      category: 'buttons',
-      description: 'A secondary button with outline style',
-      code: `<button className="px-6 py-3 border-2 border-gray-300 text-gray-700 font-medium rounded-lg hover:border-gray-400 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors" data-webstudio-element="secondary-button">
-  Cancel
-</button>`,
-      preview: '⚪ Secondary Button',
-      tags: ['button', 'secondary', 'outline'],
-      favorite: false
+      category: 'interactive',
+      icon: 'MousePointer',
+      description: 'Secondary action button',
+      template: '<button data-webstudio-element="button-secondary" className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">Click me</button>',
+      props: {
+        className: 'px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors'
+      }
     },
     {
-      id: 'card-basic',
-      name: 'Basic Card',
-      category: 'layout',
-      description: 'A simple card with shadow and padding',
-      code: `<div className="bg-white rounded-lg shadow-md p-6 border border-gray-200" data-webstudio-element="basic-card">
-  <h3 className="text-lg font-semibold text-gray-900 mb-2" data-webstudio-element="card-title">Card Title</h3>
-  <p className="text-gray-600" data-webstudio-element="card-content">This is a basic card component with some sample content.</p>
-</div>`,
-      preview: '📄 Basic Card',
-      tags: ['card', 'container', 'shadow'],
-      favorite: true
+      id: 'image-placeholder',
+      name: 'Image',
+      category: 'media',
+      icon: 'Image',
+      description: 'Image element',
+      template: '<img data-webstudio-element="image" src="https://via.placeholder.com/400x200" alt="Placeholder" className="max-w-full h-auto rounded-lg" />',
+      props: {
+        src: 'https://via.placeholder.com/400x200',
+        alt: 'Placeholder',
+        className: 'max-w-full h-auto rounded-lg'
+      }
     },
     {
-      id: 'hero-section',
-      name: 'Hero Section',
-      category: 'sections',
-      description: 'A hero section with title, subtitle, and CTA',
-      code: `<section className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-20" data-webstudio-element="hero-section">
-  <div className="max-w-4xl mx-auto text-center px-4" data-webstudio-element="hero-container">
-    <h1 className="text-5xl font-bold mb-6" data-webstudio-element="hero-title">Welcome to Our Product</h1>
-    <p className="text-xl mb-8 opacity-90" data-webstudio-element="hero-subtitle">Build amazing things with our powerful platform</p>
-    <button className="bg-white text-blue-600 px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors" data-webstudio-element="hero-cta">
-      Get Started
-    </button>
-  </div>
-</section>`,
-      preview: '🦸 Hero Section',
-      tags: ['hero', 'section', 'cta', 'gradient'],
-      favorite: true
-    },
-    {
-      id: 'navbar',
-      name: 'Navigation Bar',
-      category: 'navigation',
-      description: 'A responsive navigation bar with logo and links',
-      code: `<nav className="bg-white shadow-lg border-b border-gray-200" data-webstudio-element="navbar">
-  <div className="max-w-7xl mx-auto px-4" data-webstudio-element="nav-container">
-    <div className="flex justify-between items-center h-16" data-webstudio-element="nav-content">
-      <div className="flex items-center" data-webstudio-element="nav-brand">
-        <span className="text-xl font-bold text-gray-900" data-webstudio-element="logo">Logo</span>
-      </div>
-      <div className="hidden md:flex space-x-8" data-webstudio-element="nav-links">
-        <a href="#" className="text-gray-700 hover:text-blue-600 transition-colors" data-webstudio-element="nav-link">Home</a>
-        <a href="#" className="text-gray-700 hover:text-blue-600 transition-colors" data-webstudio-element="nav-link">About</a>
-        <a href="#" className="text-gray-700 hover:text-blue-600 transition-colors" data-webstudio-element="nav-link">Services</a>
-        <a href="#" className="text-gray-700 hover:text-blue-600 transition-colors" data-webstudio-element="nav-link">Contact</a>
-      </div>
-    </div>
-  </div>
-</nav>`,
-      preview: '🧭 Navigation Bar',
-      tags: ['nav', 'menu', 'header', 'responsive'],
-      favorite: false
-    },
-    {
-      id: 'form-contact',
-      name: 'Contact Form',
+      id: 'text-input',
+      name: 'Text Input',
       category: 'forms',
-      description: 'A contact form with validation styling',
-      code: `<form className="bg-white p-6 rounded-lg shadow-md max-w-md mx-auto" data-webstudio-element="contact-form">
-  <h2 className="text-2xl font-bold text-gray-900 mb-6" data-webstudio-element="form-title">Contact Us</h2>
-  <div className="mb-4" data-webstudio-element="form-group">
-    <label className="block text-gray-700 text-sm font-medium mb-2" data-webstudio-element="form-label">Name</label>
-    <input type="text" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" data-webstudio-element="form-input" />
-  </div>
-  <div className="mb-4" data-webstudio-element="form-group">
-    <label className="block text-gray-700 text-sm font-medium mb-2" data-webstudio-element="form-label">Email</label>
-    <input type="email" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" data-webstudio-element="form-input" />
-  </div>
-  <div className="mb-6" data-webstudio-element="form-group">
-    <label className="block text-gray-700 text-sm font-medium mb-2" data-webstudio-element="form-label">Message</label>
-    <textarea rows={4} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" data-webstudio-element="form-textarea"></textarea>
-  </div>
-  <button type="submit" className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors" data-webstudio-element="form-submit">
-    Send Message
-  </button>
-</form>`,
-      preview: '📝 Contact Form',
-      tags: ['form', 'contact', 'input', 'validation'],
-      favorite: false
-    },
-    {
-      id: 'grid-features',
-      name: 'Feature Grid',
-      category: 'layout',
-      description: 'A 3-column grid showcasing features',
-      code: `<section className="py-16 bg-gray-50" data-webstudio-element="features-section">
-  <div className="max-w-6xl mx-auto px-4" data-webstudio-element="features-container">
-    <h2 className="text-3xl font-bold text-center text-gray-900 mb-12" data-webstudio-element="features-title">Our Features</h2>
-    <div className="grid md:grid-cols-3 gap-8" data-webstudio-element="features-grid">
-      <div className="text-center" data-webstudio-element="feature-item">
-        <div className="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" data-webstudio-element="feature-icon">
-          <span className="text-2xl">⚡</span>
-        </div>
-        <h3 className="text-xl font-semibold text-gray-900 mb-2" data-webstudio-element="feature-title">Fast</h3>
-        <p className="text-gray-600" data-webstudio-element="feature-description">Lightning fast performance for your users</p>
-      </div>
-      <div className="text-center" data-webstudio-element="feature-item">
-        <div className="bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" data-webstudio-element="feature-icon">
-          <span className="text-2xl">🔒</span>
-        </div>
-        <h3 className="text-xl font-semibold text-gray-900 mb-2" data-webstudio-element="feature-title">Secure</h3>
-        <p className="text-gray-600" data-webstudio-element="feature-description">Enterprise-grade security for your data</p>
-      </div>
-      <div className="text-center" data-webstudio-element="feature-item">
-        <div className="bg-purple-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" data-webstudio-element="feature-icon">
-          <span className="text-2xl">📱</span>
-        </div>
-        <h3 className="text-xl font-semibold text-gray-900 mb-2" data-webstudio-element="feature-title">Responsive</h3>
-        <p className="text-gray-600" data-webstudio-element="feature-description">Works perfectly on all devices</p>
-      </div>
-    </div>
-  </div>
-</section>`,
-      preview: '🏗️ Feature Grid',
-      tags: ['grid', 'features', 'responsive', 'icons'],
-      favorite: true
-    },
-    {
-      id: 'testimonial',
-      name: 'Testimonial Card',
-      category: 'content',
-      description: 'A testimonial card with avatar and quote',
-      code: `<div className="bg-white p-6 rounded-lg shadow-md max-w-md mx-auto" data-webstudio-element="testimonial-card">
-  <div className="flex items-center mb-4" data-webstudio-element="testimonial-header">
-    <img className="w-12 h-12 rounded-full mr-4" src="https://via.placeholder.com/48" alt="Avatar" data-webstudio-element="testimonial-avatar" />
-    <div data-webstudio-element="testimonial-info">
-      <h4 className="font-semibold text-gray-900" data-webstudio-element="testimonial-name">John Doe</h4>
-      <p className="text-gray-600 text-sm" data-webstudio-element="testimonial-role">CEO, Company</p>
-    </div>
-  </div>
-  <blockquote className="text-gray-700 italic" data-webstudio-element="testimonial-quote">
-    "This product has completely transformed how we work. Highly recommended!"
-  </blockquote>
-</div>`,
-      preview: '💬 Testimonial',
-      tags: ['testimonial', 'quote', 'avatar', 'social-proof'],
-      favorite: false
+      icon: 'Edit3',
+      description: 'Text input field',
+      template: '<input data-webstudio-element="text-input" type="text" placeholder="Enter text..." className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />',
+      props: {
+        type: 'text',
+        placeholder: 'Enter text...',
+        className: 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500'
+      }
     }
   ]
 
   const categories = [
-    { id: 'all', name: 'All', icon: '📋' },
-    { id: 'buttons', name: 'Buttons', icon: '🔘' },
-    { id: 'layout', name: 'Layout', icon: '📐' },
-    { id: 'sections', name: 'Sections', icon: '📄' },
-    { id: 'navigation', name: 'Navigation', icon: '🧭' },
-    { id: 'forms', name: 'Forms', icon: '📝' },
-    { id: 'content', name: 'Content', icon: '📖' }
+    { id: 'all', name: 'All Components', icon: 'Package' },
+    { id: 'layout', name: 'Layout', icon: 'Layout' },
+    { id: 'text', name: 'Text', icon: 'Type' },
+    { id: 'interactive', name: 'Interactive', icon: 'MousePointer' },
+    { id: 'media', name: 'Media', icon: 'Image' },
+    { id: 'forms', name: 'Forms', icon: 'Edit3' },
+    { id: 'custom', name: 'Custom', icon: 'Package' }
   ]
 
-  const allComponents = [...builtInComponents, ...customComponents]
+  const allComponents = [...defaultComponents, ...customComponents]
 
   const filteredComponents = allComponents.filter(component => {
     const matchesSearch = component.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         component.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         component.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
+                         component.description.toLowerCase().includes(searchTerm.toLowerCase())
     
     const matchesCategory = selectedCategory === 'all' || component.category === selectedCategory
-    const matchesFavorites = !showFavoritesOnly || component.favorite
-    
-    return matchesSearch && matchesCategory && matchesFavorites
+
+    return matchesSearch && matchesCategory
   })
 
-  const handleAddComponent = useCallback(async (component: Component) => {
-    if (!currentProject) return
+  const handleComponentClick = useCallback(async (component: ComponentDefinition) => {
+    console.log(`ComponentsPanel: Adding component: ${component.name}`)
 
-    try {
-      // Get current App.tsx content
-      const currentContent = await getCurrentAppContent()
-      
-      // Insert the component code properly
-      const updatedContent = insertComponentSafely(currentContent, component.code)
-      
-      // Update the file
-      await onAddComponent('/src/App.tsx', updatedContent)
-      
-      console.log(`Added component: ${component.name}`)
-    } catch (error) {
-      console.error('Failed to add component:', error)
-    }
-  }, [currentProject, onAddComponent])
-
-  const getCurrentAppContent = async (): Promise<string> => {
-    // Default safe template
-    return `import React from 'react'
-
-function App() {
-  return (
-    <div className="min-h-screen bg-gray-50" data-webstudio-element="root">
-      <div className="container mx-auto p-8" data-webstudio-element="container">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8" data-webstudio-element="title">
-          Welcome to Aura
-        </h1>
-        {/* Components will be inserted here */}
-      </div>
-    </div>
-  )
-}
-
-export default App`
-  }
-
-  const insertComponentSafely = (content: string, componentCode: string): string => {
-    // Find the container div and insert inside it
-    const containerRegex = /(<div[^>]*data-webstudio-element="container"[^>]*>)([\s\S]*?)(<\/div>)/
-    const containerMatch = content.match(containerRegex)
-    
-    if (containerMatch) {
-      const [fullMatch, openTag, innerContent, closeTag] = containerMatch
-      
-      // Insert component before the closing tag of the container, with proper indentation
-      const newInnerContent = innerContent + `
-        ${componentCode}
-      `
-      
-      return content.replace(fullMatch, `${openTag}${newInnerContent}${closeTag}`)
-    }
-    
-    // Fallback: find the root div and insert inside it
-    const rootRegex = /(<div[^>]*data-webstudio-element="root"[^>]*>)([\s\S]*?)(<\/div>\s*\)\s*}\s*export default App)/
-    const rootMatch = content.match(rootRegex)
-    
-    if (rootMatch) {
-      const [fullMatch, openTag, innerContent, endPart] = rootMatch
-      
-      // Create a safe container if one doesn't exist
-      const hasContainer = innerContent.includes('data-webstudio-element="container"')
-      
-      if (!hasContainer) {
-        // Wrap component in a container
-        const newInnerContent = `
-      <div className="container mx-auto p-8" data-webstudio-element="container">
-        ${componentCode}
-      </div>
-    `
-        return content.replace(fullMatch, `${openTag}${newInnerContent}${endPart}`)
-      } else {
-        // Insert before the existing container
-        const newInnerContent = `
-      ${componentCode}
-      ${innerContent.trim()}
-    `
-        return content.replace(fullMatch, `${openTag}${newInnerContent}${endPart}`)
-      }
-    }
-    
-    // Final fallback: wrap everything safely
-    return `import React from 'react'
-
-function App() {
-  return (
-    <div className="min-h-screen bg-gray-50" data-webstudio-element="root">
-      <div className="container mx-auto p-8" data-webstudio-element="container">
-        ${componentCode}
-      </div>
-    </div>
-  )
-}
-
-export default App`
-  }
-
-  const handleCreateComponent = useCallback(() => {
-    if (!selectedElement) {
-      alert('Please select an element to create a component from')
+    if (!currentProject || !onCodeChange) {
+      console.warn('ComponentsPanel: No project or code change handler available')
       return
     }
 
-    const componentName = prompt('Enter component name:')
-    if (!componentName) return
+    try {
+      // Read current App.tsx content to preserve existing components
+      const webContainerService = (window as any).webContainerService || 
+                                  (window as any).webStudio?.webContainerService
+      
+      let currentAppContent = ''
+      if (webContainerService) {
+        try {
+          currentAppContent = await webContainerService.readFile('/src/App.tsx')
+        } catch (error) {
+          console.log('ComponentsPanel: Could not read current App.tsx, using default template')
+          currentAppContent = getDefaultAppTemplate(currentProject)
+        }
+      } else {
+        currentAppContent = getDefaultAppTemplate(currentProject)
+      }
+      
+      // Add the new component to the existing content
+      const updatedAppContent = addComponentToExistingApp(currentAppContent, component, selectedElement)
+      
+      // Update the file in webcontainer
+      await onCodeChange('/src/App.tsx', updatedAppContent)
+      
+      // Update project components list
+      await updateProjectComponents()
+      
+      // Trigger Canvas to re-scan for new elements
+      setTimeout(() => {
+        const webStudioCanvas = (window as any).webStudioCanvas
+        if (webStudioCanvas?.setupVisualEditing) {
+          console.log('ComponentsPanel: Triggering Canvas re-scan for new elements')
+          webStudioCanvas.setupVisualEditing()
+        }
+      }, 1500) // Wait for webcontainer to update and iframe to reload
+      
+      console.log(`ComponentsPanel: Successfully added ${component.name} to code`)
 
-    const newComponent: Component = {
-      id: `custom-${Date.now()}`,
-      name: componentName,
-      category: 'custom',
-      description: 'Custom component created from selection',
-      code: generateComponentCode(selectedElement.element),
-      preview: `🔧 ${componentName}`,
-      tags: ['custom', selectedElement.tagName.toLowerCase()],
-      favorite: false
+    } catch (error) {
+      console.error('ComponentsPanel: Error adding component:', error)
+    }
+  }, [selectedElement, currentProject, onCodeChange])
+
+  const handleRemoveComponent = useCallback(async (elementId: string) => {
+    console.log(`ComponentsPanel: Removing component with ID: ${elementId}`)
+
+    if (!currentProject || !onCodeChange) {
+      console.warn('ComponentsPanel: No project or code change handler available')
+      return
     }
 
-    setCustomComponents(prev => [...prev, newComponent])
-  }, [selectedElement])
+    try {
+      const webContainerService = (window as any).webContainerService || 
+                                  (window as any).webStudio?.webContainerService
+      
+      if (webContainerService) {
+        const currentAppContent = await webContainerService.readFile('/src/App.tsx')
+        const updatedAppContent = removeComponentFromApp(currentAppContent, elementId)
+        
+        await onCodeChange('/src/App.tsx', updatedAppContent)
+        await updateProjectComponents()
+        
+        // Trigger Canvas to re-scan after component removal
+        setTimeout(() => {
+          const webStudioCanvas = (window as any).webStudioCanvas
+          if (webStudioCanvas?.setupVisualEditing) {
+            console.log('ComponentsPanel: Triggering Canvas re-scan after component removal')
+            webStudioCanvas.setupVisualEditing()
+          }
+        }, 1500)
+        
+        console.log(`ComponentsPanel: Successfully removed component ${elementId}`)
+      }
+    } catch (error) {
+      console.error('ComponentsPanel: Error removing component:', error)
+    }
+  }, [currentProject, onCodeChange])
 
-  const toggleFavorite = useCallback((componentId: string) => {
-    setCustomComponents(prev => 
-      prev.map(comp => 
-        comp.id === componentId 
-          ? { ...comp, favorite: !comp.favorite }
-          : comp
-      )
-    )
-  }, [])
+  const getDefaultAppTemplate = (project: Project | null): string => {
+    return `import React from 'react'
 
-  const generateComponentCode = (element: HTMLElement): string => {
-    const tag = element.tagName.toLowerCase()
-    const className = element.className
-    const textContent = element.textContent
-    
-    return `<${tag}${className ? ` className="${className}"` : ''} data-webstudio-element="custom-${Date.now()}">
-  ${textContent || 'Component content'}
-</${tag}>`
-  }
-
-  if (!currentProject) {
-    return (
-      <div className="flex-1 flex items-center justify-center text-gray-400 p-4">
-        <div className="text-center">
-          <div className="text-2xl mb-2">🧩</div>
-          <p className="text-sm">No project loaded</p>
+function App() {
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center" data-webstudio-element="root">
+      <div className="max-w-md mx-auto text-center" data-webstudio-element="container">
+        <h1 className="text-4xl font-bold text-gray-900 mb-4" data-webstudio-element="title">
+          Welcome to ${project?.name || 'Your Project'}
+        </h1>
+        <p className="text-lg text-gray-600 mb-8" data-webstudio-element="description">
+          Visual design meets code. Click on any element to start editing.
+        </p>
+        <div className="space-y-4" data-webstudio-element="actions">
+          <button className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg hover:bg-blue-700 transition-colors" data-webstudio-element="primary-btn">
+            Get Started
+          </button>
+          <button className="w-full border border-gray-300 text-gray-700 py-3 px-6 rounded-lg hover:bg-gray-50 transition-colors" data-webstudio-element="secondary-btn">
+            Learn More
+          </button>
         </div>
       </div>
+    </div>
+  )
+}
+
+export default App`
+  }
+
+  const addComponentToExistingApp = (appContent: string, component: ComponentDefinition, selectedElement: SelectedElement | null): string => {
+    const lines = appContent.split('\n')
+    const uniqueId = `${component.id}-${Date.now()}`
+    const componentJSX = generateComponentJSX(component, uniqueId, '')
+    
+    // Find the best insertion point
+    let insertionLine = -1
+    let targetIndent = '          ' // Default indentation
+    
+    // If we have a selected element, try to insert near it
+    if (selectedElement?.dataAttribute) {
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].includes(`data-webstudio-element="${selectedElement.dataAttribute}"`)) {
+          insertionLine = i
+          // Calculate indentation from this line
+          const match = lines[i].match(/^(\s*)/)
+          targetIndent = match ? match[1] : '          '
+          break
+        }
+      }
+    }
+    
+    // If no selected element or element not found, find the actions div or last element in container
+    if (insertionLine === -1) {
+      // Look for actions div or any suitable container
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].includes('data-webstudio-element="actions"') ||
+            lines[i].includes('data-webstudio-element="container"')) {
+          // Find the closing tag and insert before it
+          let depth = 0
+          let foundOpening = false
+          for (let j = i; j < lines.length; j++) {
+            const line = lines[j]
+            if (line.includes('<') && !line.includes('</') && !line.includes('/>')) {
+              foundOpening = true
+              depth++
+            }
+            if (line.includes('</')) {
+              depth--
+              if (foundOpening && depth === 0) {
+                insertionLine = j - 1
+                // Get indentation from the line above the closing tag
+                const match = lines[j - 1]?.match(/^(\s*)/)
+                targetIndent = match ? match[1] : '          '
+                break
+              }
+            }
+          }
+          if (insertionLine !== -1) break
+        }
+      }
+    }
+    
+    // If still no insertion point found, insert before the last closing div
+    if (insertionLine === -1) {
+      for (let i = lines.length - 1; i >= 0; i--) {
+        if (lines[i].includes('</div>') && lines[i].trim() === '</div>') {
+          insertionLine = i
+          targetIndent = '          '
+          break
+        }
+      }
+    }
+    
+    if (insertionLine === -1) {
+      console.warn('ComponentsPanel: Could not find suitable insertion point')
+      return appContent
+    }
+    
+    // Insert the component with proper indentation
+    const indentedComponent = `${targetIndent}${componentJSX}`
+    const newLines = [
+      ...lines.slice(0, insertionLine),
+      indentedComponent,
+      ...lines.slice(insertionLine)
+    ]
+    
+    return newLines.join('\n')
+  }
+
+  const removeComponentFromApp = (appContent: string, elementId: string): string => {
+    const lines = appContent.split('\n')
+    const newLines: string[] = []
+    let skipLines = false
+    let depth = 0
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i]
+      
+      // Check if this line contains the element to remove
+      if (line.includes(`data-webstudio-element="${elementId}"`)) {
+        skipLines = true
+        depth = 0
+        
+        // If it's a self-closing tag, just skip this line
+        if (line.includes('/>')) {
+          skipLines = false
+          continue
+        }
+        
+        // Start counting depth for paired tags
+        if (line.includes('<') && !line.includes('</')) {
+          depth = 1
+        }
+        continue
+      }
+      
+      // If we're skipping lines (inside a component to remove)
+      if (skipLines) {
+        // Count opening and closing tags to know when we're done
+        if (line.includes('<') && !line.includes('</') && !line.includes('/>')) {
+          depth++
+        }
+        if (line.includes('</')) {
+          depth--
+          if (depth === 0) {
+            skipLines = false
+          }
+        }
+        continue
+      }
+      
+      // Keep this line
+      newLines.push(line)
+    }
+    
+    return newLines.join('\n')
+  }
+
+  const generateComponentJSX = (component: ComponentDefinition, uniqueId: string, indent: string): string => {
+    // Convert HTML template to JSX by simple string replacement
+    // This is more reliable than parsing and reconstructing
+    let jsxTemplate = component.template
+    
+    // Replace the data-webstudio-element with the unique ID
+    jsxTemplate = jsxTemplate.replace(
+      /data-webstudio-element="[^"]*"/,
+      `data-webstudio-element="${uniqueId}"`
     )
+    
+    // Ensure the template is already in JSX format (it should be based on the component definitions)
+    // The templates already use className, so no conversion needed
+    
+    // Add proper indentation
+    return `${indent}${jsxTemplate}`
+  }
+
+  // Scan for existing components in the current App.tsx
+  const scanExistingComponents = useCallback(async () => {
+    if (!currentProject) return
+
+    try {
+      const webContainerService = (window as any).webContainerService
+      if (webContainerService) {
+        const currentAppContent = await webContainerService.readFile('/src/App.tsx')
+        const components = extractComponentsFromApp(currentAppContent)
+        setExistingComponents(components)
+      }
+    } catch (error) {
+      console.error('ComponentsPanel: Error scanning existing components:', error)
+    }
+  }, [currentProject])
+
+  const extractComponentsFromApp = (appContent: string): {id: string, name: string, type: string}[] => {
+    const components: {id: string, name: string, type: string}[] = []
+    const lines = appContent.split('\n')
+    
+    for (const line of lines) {
+      // Look for data-webstudio-element attributes
+      const match = line.match(/data-webstudio-element="([^"]+)"/)
+      if (match) {
+        const elementId = match[1]
+        // Skip default template elements
+        if (['root', 'container', 'title', 'description', 'actions', 'primary-btn', 'secondary-btn'].includes(elementId)) {
+          continue
+        }
+        
+        // Determine component type from the element ID or tag
+        let componentType = 'Unknown'
+        let componentName = elementId
+        
+        if (elementId.includes('container')) {
+          componentType = 'Container'
+        } else if (elementId.includes('heading') || elementId.includes('h1') || elementId.includes('h2')) {
+          componentType = 'Heading'
+        } else if (elementId.includes('paragraph')) {
+          componentType = 'Paragraph'
+        } else if (elementId.includes('button')) {
+          componentType = 'Button'
+        } else if (elementId.includes('image')) {
+          componentType = 'Image'
+        } else if (elementId.includes('input')) {
+          componentType = 'Input'
+        } else if (elementId.includes('flex')) {
+          componentType = 'Flex Container'
+        } else if (elementId.includes('grid')) {
+          componentType = 'Grid Container'
+        }
+        
+        components.push({
+          id: elementId,
+          name: componentName,
+          type: componentType
+        })
+      }
+    }
+    
+    return components
+  }
+
+  // Update the updateProjectComponents function to also scan existing components
+  const updateProjectComponents = async () => {
+    if (!currentProject) return
+
+    try {
+      const updatedProject = {
+        ...currentProject,
+        customComponents: customComponents,
+        updatedAt: new Date().toISOString()
+      }
+      onProjectUpdate(updatedProject)
+      
+      // Also scan for existing components
+      await scanExistingComponents()
+    } catch (error) {
+      console.error('ComponentsPanel: Failed to update project components:', error)
+    }
+  }
+
+  // Scan existing components when project changes
+  useEffect(() => {
+    if (currentProject) {
+      scanExistingComponents()
+    }
+  }, [currentProject?.id, scanExistingComponents])
+
+  // Expose global interface for ChatBot integration
+  useEffect(() => {
+    ;(window as any).webStudioComponentsPanel = {
+      addComponent: async (componentId: string) => {
+        // Find the component definition by ID
+        const component = allComponents.find(comp => comp.id === componentId)
+        if (component) {
+          await handleComponentClick(component)
+        } else {
+          console.warn(`ComponentsPanel: Component with ID "${componentId}" not found`)
+        }
+      },
+      removeComponent: handleRemoveComponent,
+      getAvailableComponents: () => allComponents.map(comp => ({
+        id: comp.id,
+        name: comp.name,
+        category: comp.category
+      })),
+      scanComponents: scanExistingComponents
+    }
+
+    console.log('ComponentsPanel: Global interface initialized for ChatBot')
+  }, [allComponents, handleComponentClick, handleRemoveComponent, scanExistingComponents])
+
+  const handleCreateCustomComponent = useCallback(async () => {
+    if (!newComponentName.trim() || !selectedElement?.element) return
+
+    const element = selectedElement.element
+    const componentTemplate = element.outerHTML
+
+    const newComponent: ComponentDefinition = {
+      id: `custom-${Date.now()}`,
+      name: newComponentName.trim(),
+      category: 'custom',
+      icon: 'Package',
+      description: `Custom component created from ${element.tagName.toLowerCase()}`,
+      template: componentTemplate,
+      props: {
+        className: element.className || ''
+      }
+    }
+
+    const updatedCustomComponents = [...customComponents, newComponent]
+    setCustomComponents(updatedCustomComponents)
+    setNewComponentName('')
+    setIsAddingComponent(false)
+
+    // Update project
+    if (currentProject) {
+      const updatedProject = {
+        ...currentProject,
+        customComponents: updatedCustomComponents,
+        updatedAt: new Date().toISOString()
+      }
+      onProjectUpdate(updatedProject)
+    }
+
+    console.log(`ComponentsPanel: Created custom component: ${newComponent.name}`)
+  }, [newComponentName, selectedElement, customComponents, currentProject, onProjectUpdate])
+
+  const handleDeleteCustomComponent = useCallback(async (componentId: string) => {
+    const updatedCustomComponents = customComponents.filter(comp => comp.id !== componentId)
+    setCustomComponents(updatedCustomComponents)
+
+    if (currentProject) {
+      const updatedProject = {
+        ...currentProject,
+        customComponents: updatedCustomComponents,
+        updatedAt: new Date().toISOString()
+      }
+      onProjectUpdate(updatedProject)
+    }
+  }, [customComponents, currentProject, onProjectUpdate])
+
+  const getIconComponent = (iconName: string, size: number = 16) => {
+    const icons = {
+      Package, Grid, Type, Image, Square, Circle, MousePointer, Layout, Menu, Edit3
+    }
+    const IconComponent = icons[iconName as keyof typeof icons] || Package
+    return <IconComponent size={size} />
   }
 
   return (
-    <div className="flex-1 flex flex-col">
-      {/* Header */}
-      <div className="p-3 border-b border-gray-700">
-        <div className="flex items-center justify-between mb-3">
-          <h4 className="font-semibold text-white">Components</h4>
-          <div className="flex gap-1">
-            <button
-              onClick={handleCreateComponent}
-              className="btn-ghost p-1"
-              title="Create Component from Selection"
-              disabled={!selectedElement}
-            >
-              <Plus size={14} />
-            </button>
-            <button
-              onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
-              className={`btn-ghost p-1 ${showFavoritesOnly ? 'text-yellow-400' : ''}`}
-              title="Show Favorites Only"
-            >
-              <Star size={14} />
-            </button>
-          </div>
-        </div>
+    <div className="components-panel h-full flex flex-col bg-gray-800 text-white">
+      <div className="flex items-center justify-between p-3 border-b border-gray-700">
+        <h3 className="text-sm font-medium">Components</h3>
+        {selectedElement && (
+          <button
+            onClick={() => setIsAddingComponent(true)}
+            className="p-1 hover:bg-gray-700 rounded"
+            title="Create component from selection"
+          >
+            <Plus size={16} />
+          </button>
+        )}
+      </div>
 
-        {/* Search */}
-        <div className="relative mb-3">
-          <Search size={14} className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400" />
+      {/* Search */}
+      <div className="p-2 border-b border-gray-700">
+        <div className="relative">
+          <Search size={16} className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400" />
           <input
             type="text"
             placeholder="Search components..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="form-input-sm w-full pl-8"
+            className="w-full pl-8 pr-3 py-1.5 bg-gray-700 border border-gray-600 rounded text-sm focus:outline-none focus:border-blue-500"
           />
         </div>
+      </div>
 
-        {/* Categories */}
+      {/* Categories */}
+      <div className="p-2 border-b border-gray-700">
         <div className="flex flex-wrap gap-1">
           {categories.map(category => (
             <button
               key={category.id}
               onClick={() => setSelectedCategory(category.id)}
-              className={`text-xs px-2 py-1 rounded transition-colors ${
+              className={`px-2 py-1 rounded text-xs flex items-center gap-1 ${
                 selectedCategory === category.id
-                  ? 'bg-primary-600 text-white'
+                  ? 'bg-blue-600 text-white'
                   : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
               }`}
             >
-              {category.icon} {category.name}
+              {getIconComponent(category.icon, 12)}
+              {category.name}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Components Grid */}
-      <div className="flex-1 overflow-y-auto p-3">
+      {/* Existing Components in Project */}
+      {existingComponents.length > 0 && (
+        <div className="border-b border-gray-700">
+          <div className="flex items-center justify-between p-2">
+            <button
+              onClick={() => setShowExistingComponents(!showExistingComponents)}
+              className="flex items-center gap-2 text-sm font-medium text-gray-300 hover:text-white"
+            >
+              <Menu size={14} />
+              In Project ({existingComponents.length})
+            </button>
+            <button
+              onClick={scanExistingComponents}
+              className="p-1 hover:bg-gray-700 rounded"
+              title="Refresh components list"
+            >
+              <Search size={12} />
+            </button>
+          </div>
+          {showExistingComponents && (
+            <div className="px-2 pb-2 max-h-32 overflow-y-auto">
+              {existingComponents.map(component => (
+                <div
+                  key={component.id}
+                  className="flex items-center justify-between p-1.5 hover:bg-gray-700 rounded text-xs"
+                >
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <span className="text-green-400">●</span>
+                    <span className="text-white truncate">{component.type}</span>
+                    <span className="text-gray-400 truncate">({component.name})</span>
+                  </div>
+                  <button
+                    onClick={() => handleRemoveComponent(component.id)}
+                    className="p-0.5 hover:bg-red-600 rounded opacity-70 hover:opacity-100"
+                    title="Remove component"
+                  >
+                    <Trash2 size={10} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Add Custom Component Modal */}
+      {isAddingComponent && (
+        <div className="p-3 bg-gray-700 border-b border-gray-600">
+          <div className="space-y-2">
+            <input
+              type="text"
+              placeholder="Component name..."
+              value={newComponentName}
+              onChange={(e) => setNewComponentName(e.target.value)}
+              className="w-full px-2 py-1 bg-gray-600 border border-gray-500 rounded text-sm focus:outline-none focus:border-blue-500"
+              autoFocus
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={handleCreateCustomComponent}
+                className="flex-1 px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
+                disabled={!newComponentName.trim()}
+              >
+                <Check size={12} className="inline mr-1" />
+                Create
+              </button>
+              <button
+                onClick={() => {
+                  setIsAddingComponent(false)
+                  setNewComponentName('')
+                }}
+                className="flex-1 px-2 py-1 bg-gray-600 text-gray-300 rounded text-xs hover:bg-gray-500"
+              >
+                <X size={12} className="inline mr-1" />
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Components List */}
+      <div className="flex-1 overflow-y-auto">
         {filteredComponents.length === 0 ? (
-          <div className="text-center text-gray-400 py-8">
-            <p className="text-sm">No components found</p>
-            <p className="text-xs mt-1">Try adjusting your search or filters</p>
+          <div className="p-4 text-center text-gray-400 text-sm">
+            {searchTerm ? 'No components match your search' : 'No components available'}
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="p-2 space-y-1">
             {filteredComponents.map(component => (
               <div
                 key={component.id}
-                className="bg-gray-800 rounded-lg p-3 border border-gray-700 hover:border-gray-600 transition-colors cursor-pointer group"
-                onClick={() => handleAddComponent(component)}
+                className="component-item group bg-gray-700 hover:bg-gray-600 rounded p-2 cursor-pointer transition-colors"
+                onClick={() => handleComponentClick(component)}
               >
-                <div className="flex items-start justify-between mb-2">
+                <div className="flex items-start gap-2">
+                  <div className="text-blue-400 mt-0.5">
+                    {getIconComponent(component.icon, 16)}
+                  </div>
                   <div className="flex-1 min-w-0">
-                    <h5 className="font-medium text-white text-sm truncate">{component.name}</h5>
-                    <p className="text-xs text-gray-400 mt-1">{component.description}</p>
-                  </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      toggleFavorite(component.id)
-                    }}
-                    className={`btn-ghost p-1 ${component.favorite ? 'text-yellow-400' : 'text-gray-400'}`}
-                    title="Toggle Favorite"
-                  >
-                    <Star size={12} />
-                  </button>
-                </div>
-                
-                <div className="bg-gray-900 rounded p-2 mb-2 text-xs font-mono text-gray-300">
-                  {component.preview}
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <div className="flex flex-wrap gap-1">
-                    {component.tags.slice(0, 3).map(tag => (
-                      <span
-                        key={tag}
-                        className="text-xs px-2 py-0.5 bg-gray-700 text-gray-300 rounded"
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                  
-                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        navigator.clipboard.writeText(component.code)
-                      }}
-                      className="btn-ghost p-1"
-                      title="Copy Code"
-                    >
-                      <Copy size={12} />
-                    </button>
-                    {component.category === 'custom' && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          // Edit component
-                        }}
-                        className="btn-ghost p-1"
-                        title="Edit Component"
-                      >
-                        <Edit3 size={12} />
-                      </button>
-                    )}
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-medium text-white truncate">
+                        {component.name}
+                      </h4>
+                      {component.category === 'custom' && (
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleDeleteCustomComponent(component.id)
+                            }}
+                            className="p-1 hover:bg-red-600 rounded"
+                            title="Delete custom component"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1">
+                      {component.description}
+                    </p>
                   </div>
                 </div>
               </div>
             ))}
           </div>
         )}
-      </div>
-
-      {/* Device Preview Buttons */}
-      <div className="border-t border-gray-700 p-3">
-        <div className="text-xs text-gray-400 mb-2">Preview Size</div>
-        <div className="flex gap-2">
-          <button className="btn-ghost p-2" title="Mobile">
-            <Smartphone size={14} />
-          </button>
-          <button className="btn-ghost p-2" title="Tablet">
-            <Tablet size={14} />
-          </button>
-          <button className="btn-ghost p-2" title="Desktop">
-            <Monitor size={14} />
-          </button>
-        </div>
       </div>
     </div>
   )

@@ -11,87 +11,121 @@ import {
   ChevronDown,
   ChevronRight,
   Plus,
-  Search
+  Search,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react'
-import type { SelectedElement, Project } from '../types'
-
-interface LayersPanelProps {
-  selectedElement: SelectedElement | null
-  onElementSelect: (element: SelectedElement) => void
-  currentProject: Project | null
-  onCodeChange: (filePath: string, content: string) => void
-}
-
-interface LayerNode {
-  id: string
-  name: string
-  type: string
-  element?: HTMLElement
-  children: LayerNode[]
-  visible: boolean
-  locked: boolean
-  dataAttribute: string
-  depth: number
-}
+import type { SelectedElement, Project, LayerNode, LayersPanelProps } from '../types'
 
 const LayersPanel: React.FC<LayersPanelProps> = ({
   selectedElement,
   onElementSelect,
   currentProject,
-  onCodeChange
+  onCodeChange,
+  onProjectUpdate
 }) => {
   const [layers, setLayers] = useState<LayerNode[]>([])
-  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set())
+  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set(['root']))
   const [searchTerm, setSearchTerm] = useState('')
   const [draggedNode, setDraggedNode] = useState<LayerNode | null>(null)
+  const [dragOverNode, setDragOverNode] = useState<LayerNode | null>(null)
 
+  // Initialize layers from project or scan DOM
+  useEffect(() => {
+    if (currentProject?.layers && currentProject.layers.length > 0) {
+      setLayers(currentProject.layers)
+      console.log('LayersPanel: Loaded layers from project state')
+    } else {
+      updateLayersFromDOM()
+    }
+  }, [currentProject?.id])
+
+  // Re-scan when selectedElement changes
   useEffect(() => {
     if (selectedElement) {
       updateLayersFromDOM()
     }
-  }, [selectedElement])
+  }, [selectedElement?.element])
 
   const updateLayersFromDOM = useCallback(() => {
-    // Get all elements with data-webstudio-element attributes
-    const iframe = document.getElementById('previewFrame') as HTMLIFrameElement
-    if (!iframe?.contentDocument) return
+    console.log('LayersPanel: Scanning DOM for editable elements...')
+    
+    const iframe = document.querySelector('.webstudio-preview-frame') as HTMLIFrameElement
+    if (!iframe?.contentDocument) {
+      console.warn('LayersPanel: Could not access iframe content')
+      return
+    }
 
-    const elements = iframe.contentDocument.querySelectorAll('[data-webstudio-element]')
+    const iframeDoc = iframe.contentDocument
+    const elements = iframeDoc.querySelectorAll('[data-webstudio-element]')
+    console.log(`LayersPanel: Found ${elements.length} editable elements`)
+    
+    if (elements.length === 0) {
+      console.warn('LayersPanel: No elements with data-webstudio-element found')
+      return
+    }
+
     const layerNodes: LayerNode[] = []
-
+    
     elements.forEach((element, index) => {
       const htmlElement = element as HTMLElement
       const dataAttr = htmlElement.getAttribute('data-webstudio-element') || `element-${index}`
+      const parentDataAttr = htmlElement.parentElement?.getAttribute('data-webstudio-element')
       
       const node: LayerNode = {
-        id: `layer-${index}`,
-        name: getElementDisplayName(htmlElement),
+        id: `layer-${dataAttr}-${index}`,
+        name: getElementDisplayName(htmlElement, dataAttr),
         type: htmlElement.tagName.toLowerCase(),
         element: htmlElement,
         children: [],
-        visible: htmlElement.style.display !== 'none',
+        visible: !htmlElement.style.display || htmlElement.style.display !== 'none',
         locked: htmlElement.hasAttribute('data-locked'),
         dataAttribute: dataAttr,
-        depth: getElementDepth(htmlElement)
+        depth: getElementDepth(htmlElement),
+        parentId: parentDataAttr ? `layer-${parentDataAttr}` : undefined,
+        order: index
       }
 
       layerNodes.push(node)
     })
 
-    // Sort by depth to create hierarchy
-    const sortedLayers = buildLayerHierarchy(layerNodes)
-    setLayers(sortedLayers)
-  }, [])
+    // Build hierarchy
+    const hierarchicalLayers = buildLayerHierarchy(layerNodes)
+    setLayers(hierarchicalLayers)
+    
+    // Update project with new layer structure
+    if (currentProject && hierarchicalLayers.length > 0) {
+      const updatedProject = {
+        ...currentProject,
+        layers: hierarchicalLayers,
+        updatedAt: new Date().toISOString()
+      }
+      onProjectUpdate(updatedProject)
+    }
+    
+    console.log(`LayersPanel: Updated layer hierarchy with ${hierarchicalLayers.length} layers`)
+  }, [currentProject, onProjectUpdate])
 
-  const getElementDisplayName = (element: HTMLElement): string => {
-    const dataAttr = element.getAttribute('data-webstudio-element')
-    if (dataAttr) return dataAttr
-
+  const getElementDisplayName = (element: HTMLElement, dataAttr: string): string => {
+    if (dataAttr && dataAttr !== element.tagName.toLowerCase()) {
+      return dataAttr
+    }
+    
     const id = element.id
     if (id) return `#${id}`
 
     const className = element.className
-    if (className) return `.${className.split(' ')[0]}`
+    if (className) {
+      const firstClass = className.split(' ')[0]
+      return `.${firstClass}`
+    }
+
+    if (['h1', 'h2', 'h3', 'p', 'span', 'button', 'a'].includes(element.tagName.toLowerCase())) {
+      const text = element.textContent?.trim()
+      if (text && text.length > 0) {
+        return `${element.tagName.toLowerCase()}: "${text.substring(0, 20)}${text.length > 20 ? '...' : ''}"`
+      }
+    }
 
     return element.tagName.toLowerCase()
   }
@@ -99,7 +133,9 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
   const getElementDepth = (element: HTMLElement): number => {
     let depth = 0
     let parent = element.parentElement
-    while (parent && parent.hasAttribute('data-webstudio-element')) {
+    const rootElement = element.ownerDocument.querySelector('[data-webstudio-element="root"]')
+    
+    while (parent && parent !== rootElement && parent.hasAttribute?.('data-webstudio-element')) {
       depth++
       parent = parent.parentElement
     }
@@ -107,37 +143,80 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
   }
 
   const buildLayerHierarchy = (nodes: LayerNode[]): LayerNode[] => {
-    // For simplicity, we'll just sort by depth
-    // In a real implementation, you'd build a proper tree structure
-    return nodes.sort((a, b) => a.depth - b.depth)
+    const nodeMap = new Map<string, LayerNode>()
+    const rootNodes: LayerNode[] = []
+    
+    nodes.forEach(node => {
+      nodeMap.set(node.dataAttribute, node)
+    })
+
+    nodes.forEach(node => {
+      if (node.parentId) {
+        const parentDataAttr = node.parentId.replace('layer-', '')
+        const parent = nodeMap.get(parentDataAttr)
+        if (parent) {
+          parent.children.push(node)
+        } else {
+          rootNodes.push(node)
+        }
+      } else {
+        rootNodes.push(node)
+      }
+    })
+
+    const sortByOrder = (a: LayerNode, b: LayerNode) => a.order - b.order
+    rootNodes.sort(sortByOrder)
+    
+    const sortChildren = (node: LayerNode) => {
+      node.children.sort(sortByOrder)
+      node.children.forEach(sortChildren)
+    }
+    
+    rootNodes.forEach(sortChildren)
+    return rootNodes
   }
 
   const handleLayerClick = useCallback((node: LayerNode) => {
-    if (!node.element) return
+    if (!node.element || node.locked) return
 
-    const computedStyle = getComputedStyle(node.element)
+    console.log(`LayersPanel: Layer clicked: ${node.name}`)
+    
+    const iframe = document.querySelector('.webstudio-preview-frame') as HTMLIFrameElement
+    if (!iframe?.contentWindow) return
+
+    const computedStyle = iframe.contentWindow.getComputedStyle(node.element)
     const selectedElement: SelectedElement = {
       id: node.element.id || '',
       className: node.element.className || '',
       tagName: node.element.tagName,
       textContent: node.element.textContent || '',
       styles: {
-        display: computedStyle.display,
-        width: computedStyle.width,
-        height: computedStyle.height,
-        margin: computedStyle.margin,
-        padding: computedStyle.padding,
-        fontSize: computedStyle.fontSize,
-        fontWeight: computedStyle.fontWeight,
-        color: computedStyle.color,
-        backgroundColor: computedStyle.backgroundColor,
-        borderWidth: computedStyle.borderWidth,
-        borderStyle: computedStyle.borderStyle,
-        borderColor: computedStyle.borderColor,
-        borderRadius: computedStyle.borderRadius,
+        display: computedStyle.display || 'block',
+        width: computedStyle.width || 'auto',
+        height: computedStyle.height || 'auto',
+        margin: computedStyle.margin || '0px',
+        padding: computedStyle.padding || '0px',
+        fontSize: computedStyle.fontSize || '16px',
+        fontWeight: computedStyle.fontWeight || 'normal',
+        color: computedStyle.color || 'rgb(0, 0, 0)',
+        backgroundColor: computedStyle.backgroundColor || 'rgba(0, 0, 0, 0)',
+        borderWidth: computedStyle.borderWidth || '0px',
+        borderStyle: computedStyle.borderStyle || 'none',
+        borderColor: computedStyle.borderColor || 'rgb(0, 0, 0)',
+        borderRadius: computedStyle.borderRadius || '0px',
       },
       element: node.element,
       dataAttribute: node.dataAttribute
+    }
+
+    // Highlight element in iframe
+    const iframeDoc = iframe.contentDocument
+    if (iframeDoc) {
+      iframeDoc.querySelectorAll('[data-webstudio-selected]').forEach(el => {
+        el.removeAttribute('data-webstudio-selected')
+      })
+      
+      node.element.setAttribute('data-webstudio-selected', 'true')
     }
 
     onElementSelect(selectedElement)
@@ -145,101 +224,85 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
 
   const handleToggleVisibility = useCallback(async (node: LayerNode, e: React.MouseEvent) => {
     e.stopPropagation()
-    if (!node.element || !currentProject) return
+    if (!node.element || node.locked) return
 
     const newVisibility = !node.visible
     node.element.style.display = newVisibility ? '' : 'none'
     
-    // Update the layer state
-    setLayers(prev => prev.map(layer => 
-      layer.id === node.id ? { ...layer, visible: newVisibility } : layer
-    ))
-
-    // Update the code
-    await updateElementInCode(node.element, 'style.display', newVisibility ? 'block' : 'none')
-  }, [currentProject])
-
-  const handleToggleLock = useCallback(async (node: LayerNode, e: React.MouseEvent) => {
-    e.stopPropagation()
-    if (!node.element || !currentProject) return
-
-    const newLocked = !node.locked
-    if (newLocked) {
-      node.element.setAttribute('data-locked', 'true')
-    } else {
-      node.element.removeAttribute('data-locked')
+    const updateLayers = (layers: LayerNode[]): LayerNode[] => {
+      return layers.map(layer => {
+        if (layer.id === node.id) {
+          return { ...layer, visible: newVisibility }
+        }
+        if (layer.children.length > 0) {
+          return { ...layer, children: updateLayers(layer.children) }
+        }
+        return layer
+      })
+    }
+    
+    const updatedLayers = updateLayers(layers)
+    setLayers(updatedLayers)
+    
+    if (currentProject) {
+      const updatedProject = {
+        ...currentProject,
+        layers: updatedLayers,
+        updatedAt: new Date().toISOString()
+      }
+      onProjectUpdate(updatedProject)
     }
 
-    // Update the layer state
-    setLayers(prev => prev.map(layer => 
-      layer.id === node.id ? { ...layer, locked: newLocked } : layer
-    ))
-
-    // Update the code
-    await updateElementInCode(node.element, 'data-locked', newLocked ? 'true' : null)
-  }, [currentProject])
+    await regenerateComponent()
+  }, [layers, currentProject, onProjectUpdate])
 
   const handleDeleteLayer = useCallback(async (node: LayerNode, e: React.MouseEvent) => {
     e.stopPropagation()
-    if (!node.element || !currentProject) return
+    if (!node.element || node.locked) return
 
     if (!confirm(`Are you sure you want to delete "${node.name}"?`)) return
 
-    // Remove from DOM
     node.element.remove()
 
-    // Update layers
-    setLayers(prev => prev.filter(layer => layer.id !== node.id))
-
-    // Update the code by regenerating the component
-    await regenerateComponent()
-  }, [currentProject])
-
-  const handleDuplicateLayer = useCallback(async (node: LayerNode, e: React.MouseEvent) => {
-    e.stopPropagation()
-    if (!node.element || !currentProject) return
-
-    // Clone the element
-    const clonedElement = node.element.cloneNode(true) as HTMLElement
-    const newDataAttr = `${node.dataAttribute}-copy-${Date.now()}`
-    clonedElement.setAttribute('data-webstudio-element', newDataAttr)
-
-    // Insert after the original element
-    node.element.parentNode?.insertBefore(clonedElement, node.element.nextSibling)
-
-    // Update layers
-    updateLayersFromDOM()
-
-    // Update the code
-    await regenerateComponent()
-  }, [currentProject])
-
-  const updateElementInCode = async (element: HTMLElement, property: string, value: string | null) => {
-    if (!currentProject) return
-
-    try {
-      // Generate updated component code
-      await regenerateComponent()
-    } catch (error) {
-      console.error('Failed to update code:', error)
+    const removeLayers = (layers: LayerNode[]): LayerNode[] => {
+      return layers.filter(layer => {
+        if (layer.id === node.id) {
+          return false
+        }
+        if (layer.children.length > 0) {
+          layer.children = removeLayers(layer.children)
+        }
+        return true
+      })
     }
-  }
+    
+    const updatedLayers = removeLayers(layers)
+    setLayers(updatedLayers)
+    
+    if (currentProject) {
+      const updatedProject = {
+        ...currentProject,
+        layers: updatedLayers,
+        updatedAt: new Date().toISOString()
+      }
+      onProjectUpdate(updatedProject)
+    }
+
+    await regenerateComponent()
+  }, [layers, currentProject, onProjectUpdate])
 
   const regenerateComponent = async () => {
     if (!currentProject) return
 
     try {
-      // Get the current DOM structure
-      const iframe = document.getElementById('previewFrame') as HTMLIFrameElement
+      const iframe = document.querySelector('.webstudio-preview-frame') as HTMLIFrameElement
       if (!iframe?.contentDocument) return
 
       const rootElement = iframe.contentDocument.querySelector('[data-webstudio-element="root"]')
       if (!rootElement) return
 
-      // Generate new JSX from DOM
       const newJSX = generateJSXFromDOM(rootElement as HTMLElement)
       
-      // Create complete component with proper structure
       const componentCode = `import React from 'react'
 
 function App() {
@@ -250,10 +313,10 @@ function App() {
 
 export default App`
 
-      // Save the updated code
       await onCodeChange('/src/App.tsx', componentCode)
+      console.log('LayersPanel: Component regenerated successfully')
     } catch (error) {
-      console.error('Failed to regenerate component:', error)
+      console.error('LayersPanel: Failed to regenerate component:', error)
     }
   }
 
@@ -261,317 +324,155 @@ export default App`
     const tag = element.tagName.toLowerCase()
     const indentStr = ' '.repeat(indent)
     
-    // Get attributes
     const attributes: string[] = []
     Array.from(element.attributes).forEach(attr => {
       if (attr.name === 'class') {
         attributes.push(`className="${attr.value}"`)
-      } else if (attr.name.startsWith('data-')) {
+      } else if (attr.name.startsWith('data-webstudio-')) {
         attributes.push(`${attr.name}="${attr.value}"`)
-      } else if (attr.name === 'style' && attr.value) {
-        // Convert CSS to JSX style object
-        const styleObj = attr.value.split(';')
-          .filter(s => s.trim())
-          .map(s => {
-            const [prop, val] = s.split(':')
-            if (!prop || !val) return ''
-            const jsxProp = prop.trim().replace(/-([a-z])/g, (g) => g[1].toUpperCase())
-            return `${jsxProp}: '${val.trim()}'`
-          })
-          .filter(s => s)
-          .join(', ')
-        if (styleObj) {
-          attributes.push(`style={{${styleObj}}}`)
-        }
-      } else if (['src', 'alt', 'href', 'type', 'placeholder'].includes(attr.name)) {
+      } else if (['src', 'alt', 'href', 'type', 'placeholder', 'id'].includes(attr.name)) {
         attributes.push(`${attr.name}="${attr.value}"`)
       }
     })
 
     const attrString = attributes.length > 0 ? ' ' + attributes.join(' ') : ''
     
-    // Handle children - only process WebStudio elements
     const childElements = Array.from(element.children)
       .filter(child => child.hasAttribute('data-webstudio-element'))
-    
-    if (childElements.length > 0) {
-      const childrenJSX = childElements
-        .map(child => generateJSXFromDOM(child as HTMLElement, indent + 2))
-        .join('\n')
-      
-      return `${indentStr}<${tag}${attrString}>
-${childrenJSX}
+      .map(child => generateJSXFromDOM(child as HTMLElement, indent + 2))
+
+    const textContent = element.childNodes.length > 0 && 
+      Array.from(element.childNodes).some(node => node.nodeType === Node.TEXT_NODE) 
+      ? element.textContent?.trim() 
+      : ''
+
+    if (childElements.length === 0 && !textContent) {
+      return `<${tag}${attrString} />`
+    }
+
+    if (childElements.length === 0 && textContent) {
+      return `<${tag}${attrString}>${textContent}</${tag}>`
+    }
+
+    return `<${tag}${attrString}>
+${childElements.map(child => indentStr + '  ' + child).join('\n')}
 ${indentStr}</${tag}>`
+  }
+
+  const toggleExpanded = (nodeId: string) => {
+    const newExpanded = new Set(expandedNodes)
+    if (newExpanded.has(nodeId)) {
+      newExpanded.delete(nodeId)
     } else {
-      // Handle text content and self-closing tags
-      const textContent = getDirectTextContent(element)
-      
-      if (textContent && textContent.trim()) {
-        return `${indentStr}<${tag}${attrString}>
-${indentStr}  ${textContent.trim()}
-${indentStr}</${tag}>`
-      } else if (['img', 'input', 'br', 'hr'].includes(tag)) {
-        return `${indentStr}<${tag}${attrString} />`
-      } else {
-        return `${indentStr}<${tag}${attrString}></${tag}>`
-      }
+      newExpanded.add(nodeId)
     }
+    setExpandedNodes(newExpanded)
   }
 
-  const getDirectTextContent = (element: HTMLElement): string => {
-    // Get only the direct text content, not from child elements
-    let textContent = ''
-    for (const node of element.childNodes) {
-      if (node.nodeType === Node.TEXT_NODE) {
-        textContent += node.textContent || ''
-      }
-    }
-    return textContent.trim()
-  }
+  const renderLayerNode = (node: LayerNode, depth: number = 0): React.ReactNode => {
+    const isExpanded = expandedNodes.has(node.id)
+    const hasChildren = node.children.length > 0
+    const isSelected = selectedElement?.dataAttribute === node.dataAttribute
 
-  const handleAddElement = useCallback(async (elementType: string) => {
-    if (!currentProject) return
-
-    const iframe = document.getElementById('previewFrame') as HTMLIFrameElement
-    if (!iframe?.contentDocument) return
-
-    // Find the selected parent or use the root container
-    let parentElement = selectedElement?.element
-    
-    if (!parentElement) {
-      // Try to find a container element
-      parentElement = iframe.contentDocument.querySelector('[data-webstudio-element="container"]') as HTMLElement
-      
-      if (!parentElement) {
-        // Use the root element
-        parentElement = iframe.contentDocument.querySelector('[data-webstudio-element="root"]') as HTMLElement
-      }
-    }
-    
-    if (!parentElement) return
-
-    // Create new element
-    const newElement = iframe.contentDocument.createElement(elementType)
-    const elementId = `new-${elementType}-${Date.now()}`
-    newElement.setAttribute('data-webstudio-element', elementId)
-    
-    // Add default content and styling based on element type
-    switch (elementType) {
-      case 'div':
-        newElement.className = 'p-4 border border-gray-300 rounded-lg bg-white'
-        newElement.textContent = 'New Container'
-        break
-      case 'button':
-        newElement.className = 'px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors'
-        newElement.textContent = 'Click me'
-        break
-      case 'h1':
-        newElement.className = 'text-3xl font-bold text-gray-900 mb-4'
-        newElement.textContent = 'New Heading'
-        break
-      case 'h2':
-        newElement.className = 'text-2xl font-semibold text-gray-900 mb-3'
-        newElement.textContent = 'New Heading'
-        break
-      case 'h3':
-        newElement.className = 'text-xl font-semibold text-gray-900 mb-2'
-        newElement.textContent = 'New Heading'
-        break
-      case 'p':
-        newElement.className = 'text-gray-700 mb-4'
-        newElement.textContent = 'New paragraph text. Click to edit this content.'
-        break
-      case 'img':
-        newElement.className = 'max-w-full h-auto rounded-lg'
-        newElement.setAttribute('src', 'https://via.placeholder.com/400x200')
-        newElement.setAttribute('alt', 'Placeholder image')
-        break
-      case 'input':
-        newElement.className = 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500'
-        newElement.setAttribute('type', 'text')
-        newElement.setAttribute('placeholder', 'Enter text...')
-        break
-      default:
-        newElement.textContent = `New ${elementType}`
-    }
-
-    // Append to parent element
-    parentElement.appendChild(newElement)
-
-    // Update layers
-    updateLayersFromDOM()
-
-    // Regenerate component code
-    await regenerateComponent()
-  }, [selectedElement, currentProject])
-
-  const filteredLayers = layers.filter(layer =>
-    layer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    layer.type.toLowerCase().includes(searchTerm.toLowerCase())
-  )
-
-  if (!currentProject) {
     return (
-      <div className="flex-1 flex items-center justify-center text-gray-400 p-4">
-        <div className="text-center">
-          <div className="text-2xl mb-2">📋</div>
-          <p className="text-sm">No project loaded</p>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="flex-1 flex flex-col">
-      {/* Header */}
-      <div className="p-3 border-b border-gray-700">
-        <div className="flex items-center justify-between mb-3">
-          <h4 className="font-semibold text-white">Layers</h4>
-          <div className="flex gap-1">
-            <button 
-              onClick={() => handleAddElement('div')}
-              className="btn-ghost p-1" 
-              title="Add Div"
+      <div key={node.id} className="layer-node">
+        <div 
+          className={`layer-item flex items-center gap-1 px-2 py-1 text-xs hover:bg-gray-700 cursor-pointer ${
+            isSelected ? 'bg-blue-600' : ''
+          }`}
+          style={{ paddingLeft: `${8 + depth * 16}px` }}
+          onClick={() => handleLayerClick(node)}
+        >
+          {hasChildren && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                toggleExpanded(node.id)
+              }}
+              className="p-0.5 hover:bg-gray-600 rounded"
             >
-              <Plus size={14} />
+              {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+            </button>
+          )}
+          {!hasChildren && <div className="w-5" />}
+          
+          <span className="flex-1 truncate" title={node.name}>
+            {node.name}
+          </span>
+          
+          <div className="flex items-center gap-1">
+            <button
+              onClick={(e) => handleToggleVisibility(node, e)}
+              className="p-0.5 hover:bg-gray-600 rounded"
+              title={node.visible ? 'Hide' : 'Show'}
+            >
+              {node.visible ? <Eye size={12} /> : <EyeOff size={12} />}
+            </button>
+            
+            <button
+              onClick={(e) => handleDeleteLayer(node, e)}
+              className="p-0.5 hover:bg-red-600 rounded"
+              title="Delete"
+            >
+              <Trash2 size={12} />
             </button>
           </div>
         </div>
         
-        {/* Search */}
+        {hasChildren && isExpanded && (
+          <div>
+            {node.children.map(child => renderLayerNode(child, depth + 1))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  const filteredLayers = searchTerm
+    ? layers.filter(layer => 
+        layer.name.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    : layers
+
+  return (
+    <div className="layers-panel h-full flex flex-col bg-gray-800 text-white">
+      <div className="flex items-center justify-between p-3 border-b border-gray-700">
+        <h3 className="text-sm font-medium">Layers</h3>
+        <button
+          onClick={updateLayersFromDOM}
+          className="p-1 hover:bg-gray-700 rounded"
+          title="Refresh layers"
+        >
+          <Plus size={16} />
+        </button>
+      </div>
+
+      <div className="p-2 border-b border-gray-700">
         <div className="relative">
-          <Search size={14} className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400" />
+          <Search size={16} className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400" />
           <input
             type="text"
             placeholder="Search layers..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="form-input-sm w-full pl-8"
+            className="w-full pl-8 pr-3 py-1.5 bg-gray-700 border border-gray-600 rounded text-sm focus:outline-none focus:border-blue-500"
           />
         </div>
       </div>
 
-      {/* Add Element Buttons */}
-      <div className="p-3 border-b border-gray-700">
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            onClick={() => handleAddElement('div')}
-            className="btn btn-secondary text-xs justify-start"
-          >
-            📦 Div
-          </button>
-          <button
-            onClick={() => handleAddElement('button')}
-            className="btn btn-secondary text-xs justify-start"
-          >
-            🔘 Button
-          </button>
-          <button
-            onClick={() => handleAddElement('h1')}
-            className="btn btn-secondary text-xs justify-start"
-          >
-            📝 Heading
-          </button>
-          <button
-            onClick={() => handleAddElement('p')}
-            className="btn btn-secondary text-xs justify-start"
-          >
-            📄 Text
-          </button>
-          <button
-            onClick={() => handleAddElement('img')}
-            className="btn btn-secondary text-xs justify-start"
-          >
-            🖼️ Image
-          </button>
-          <button
-            onClick={() => handleAddElement('input')}
-            className="btn btn-secondary text-xs justify-start"
-          >
-            📝 Input
-          </button>
-        </div>
-      </div>
-
-      {/* Layers List */}
       <div className="flex-1 overflow-y-auto">
         {filteredLayers.length === 0 ? (
-          <div className="p-4 text-center text-gray-400">
-            <p className="text-sm">No layers found</p>
-            <p className="text-xs mt-1">Try selecting an element in the canvas</p>
+          <div className="p-4 text-center text-gray-400 text-sm">
+            No layers found. Try refreshing or add some elements.
           </div>
         ) : (
-          <div className="p-2">
-            {filteredLayers.map((layer) => (
-              <div
-                key={layer.id}
-                className={`layer-item group ${
-                  selectedElement?.dataAttribute === layer.dataAttribute ? 'active' : ''
-                }`}
-                style={{ paddingLeft: `${layer.depth * 16 + 8}px` }}
-                onClick={() => handleLayerClick(layer)}
-              >
-                <div className="flex items-center gap-2 flex-1 min-w-0">
-                  <span className="text-xs">{getLayerIcon(layer.type)}</span>
-                  <span className="flex-1 truncate text-sm">{layer.name}</span>
-                </div>
-                
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
-                    onClick={(e) => handleToggleVisibility(layer, e)}
-                    className="btn-ghost p-1"
-                    title={layer.visible ? 'Hide' : 'Show'}
-                  >
-                    {layer.visible ? <Eye size={12} /> : <EyeOff size={12} />}
-                  </button>
-                  
-                  <button
-                    onClick={(e) => handleToggleLock(layer, e)}
-                    className="btn-ghost p-1"
-                    title={layer.locked ? 'Unlock' : 'Lock'}
-                  >
-                    {layer.locked ? <Lock size={12} /> : <Unlock size={12} />}
-                  </button>
-                  
-                  <button
-                    onClick={(e) => handleDuplicateLayer(layer, e)}
-                    className="btn-ghost p-1"
-                    title="Duplicate"
-                  >
-                    <Copy size={12} />
-                  </button>
-                  
-                  <button
-                    onClick={(e) => handleDeleteLayer(layer, e)}
-                    className="btn-ghost p-1 text-red-400 hover:text-red-300"
-                    title="Delete"
-                  >
-                    <Trash2 size={12} />
-                  </button>
-                </div>
-              </div>
-            ))}
+          <div>
+            {filteredLayers.map(layer => renderLayerNode(layer))}
           </div>
         )}
       </div>
     </div>
   )
-}
-
-const getLayerIcon = (type: string): string => {
-  switch (type) {
-    case 'div': return '📦'
-    case 'button': return '🔘'
-    case 'h1':
-    case 'h2':
-    case 'h3': return '📝'
-    case 'p': return '📄'
-    case 'img': return '🖼️'
-    case 'input': return '📝'
-    case 'a': return '🔗'
-    case 'span': return '📝'
-    default: return '📋'
-  }
 }
 
 export default LayersPanel
